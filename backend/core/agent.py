@@ -9,6 +9,7 @@ from openai import OpenAI
 
 from config import get_settings
 from core.code_analysis import CodeAnalysisAgent
+from core.query_planner import QueryPlanner, SearchStrategy
 from core.retrieval import HybridRetriever
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ Context will be provided from the search results. Use this context to answer the
             )
 
         self.retriever = HybridRetriever()
+        self.query_planner = QueryPlanner()
         self.code_agent = CodeAnalysisAgent()
 
     def _format_context(self, results: List[Dict[str, Any]]) -> str:
@@ -109,28 +111,6 @@ Context will be provided from the search results. Use this context to answer the
 
         return "\n".join(context_parts)
 
-    async def _is_code_query(self, query: str) -> bool:
-        """Determine if query is about code analysis."""
-        code_keywords = [
-            "code",
-            "function",
-            "class",
-            "method",
-            "implementation",
-            "file",
-            "module",
-            "import",
-            "api",
-            "endpoint",
-            "handler",
-            "component",
-            "hook",
-            "variable",
-            "constant",
-        ]
-        query_lower = query.lower()
-        return any(keyword in query_lower for keyword in code_keywords)
-
     async def chat(
         self,
         query: str,
@@ -138,15 +118,21 @@ Context will be provided from the search results. Use this context to answer the
         project_ids: Optional[List[int]] = None,
     ) -> str:
         """Process a chat query and return response."""
-        # Retrieve relevant context
+        # Generate search plan using QueryPlanner
+        search_plan = await self.query_planner.plan(query, conversation_history)
+        logger.info(f"Search plan: intent={search_plan.intent}, strategy={search_plan.strategy}")
+
+        # Retrieve relevant context using the plan
         retrieval_results = await self.retriever.retrieve(
             query=query,
             project_ids=project_ids,
+            search_plan=search_plan,
         )
 
-        # Check if this is a code-specific query
+        # Check if code analysis is needed (from plan or code_deep strategy)
         code_analysis = None
-        if await self._is_code_query(query) and project_ids:
+        if (search_plan.requires_code_analysis or
+            search_plan.strategy == SearchStrategy.CODE_DEEP) and project_ids:
             for project_id in project_ids[:1]:  # Analyze first project
                 code_analysis = await self.code_agent.analyze(query, project_id)
                 break
@@ -195,15 +181,21 @@ Context will be provided from the search results. Use this context to answer the
         project_ids: Optional[List[int]] = None,
     ) -> AsyncGenerator[str, None]:
         """Process a chat query and stream the response."""
-        # Retrieve relevant context
+        # Generate search plan using QueryPlanner
+        search_plan = await self.query_planner.plan(query, conversation_history)
+        logger.info(f"Search plan: intent={search_plan.intent}, strategy={search_plan.strategy}, reasoning={search_plan.reasoning}")
+
+        # Retrieve relevant context using the plan
         retrieval_results = await self.retriever.retrieve(
             query=query,
             project_ids=project_ids,
+            search_plan=search_plan,
         )
 
-        # Check if this is a code-specific query
+        # Check if code analysis is needed (from plan or code_deep strategy)
         code_analysis = None
-        if await self._is_code_query(query) and project_ids:
+        if (search_plan.requires_code_analysis or
+            search_plan.strategy == SearchStrategy.CODE_DEEP) and project_ids:
             for project_id in project_ids[:1]:
                 code_analysis = await self.code_agent.analyze(query, project_id)
                 break

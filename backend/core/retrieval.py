@@ -1,6 +1,8 @@
 """Hybrid retrieval combining vector search and structured filters."""
 
+import asyncio
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
@@ -8,10 +10,13 @@ from openai import OpenAI
 from config import get_settings
 from core.embedding import EmbeddingService
 from core.gitlab_client import GitLabClient
+from core.query_planner import SearchPlan, SearchStrategy, SubQuery
+
+logger = logging.getLogger(__name__)
 
 
 class HybridRetriever:
-    """Combines vector search with GitLab API queries."""
+    """Combines vector search with GitLab API queries, driven by SearchPlans."""
 
     FILTER_EXTRACTION_PROMPT = """You are a query analyzer for a GitLab search system. Extract structured filters from the user's natural language query.
 
@@ -53,7 +58,7 @@ Query: "{query}"
         self.top_k = settings.top_k_results
 
     async def extract_filters(self, query: str) -> Dict[str, Any]:
-        """Use LLM to extract structured filters from query."""
+        """Use LLM to extract structured filters from query (legacy method)."""
         try:
             response = self.openai.chat.completions.create(
                 model=self.model,
@@ -85,9 +90,34 @@ Query: "{query}"
         query: str,
         project_ids: Optional[List[int]] = None,
         top_k: Optional[int] = None,
+        search_plan: Optional[SearchPlan] = None,
     ) -> List[Dict[str, Any]]:
-        """Perform hybrid retrieval combining vector search and API queries."""
+        """Perform hybrid retrieval, optionally driven by a SearchPlan.
+
+        Args:
+            query: The search query
+            project_ids: List of project IDs to search within
+            top_k: Maximum number of results to return
+            search_plan: Optional SearchPlan from QueryPlanner
+
+        Returns:
+            List of retrieval results with scores and metadata
+        """
         top_k = top_k or self.top_k
+
+        if search_plan:
+            return await self._execute_plan(search_plan, project_ids, top_k)
+        else:
+            # Legacy behavior for backwards compatibility
+            return await self._legacy_retrieve(query, project_ids, top_k)
+
+    async def _legacy_retrieve(
+        self,
+        query: str,
+        project_ids: Optional[List[int]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """Original retrieval logic (kept for backwards compatibility)."""
         results = []
 
         # Extract filters from query
@@ -115,10 +145,178 @@ Query: "{query}"
 
         return ranked_results[:top_k]
 
+    async def _execute_plan(
+        self,
+        plan: SearchPlan,
+        project_ids: Optional[List[int]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """Execute a SearchPlan and return results."""
+        results = []
+
+        # Sort sub-queries by priority
+        sorted_queries = sorted(plan.sub_queries, key=lambda sq: sq.priority)
+
+        # Determine execution strategy
+        if plan.strategy == SearchStrategy.PARALLEL:
+            # Execute all sub-queries in parallel
+            tasks = [
+                self._execute_sub_query(sq, project_ids, top_k)
+                for sq in sorted_queries
+                if sq.query_type != "code_analysis"  # Code analysis handled separately
+            ]
+            if tasks:
+                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in task_results:
+                    if isinstance(result, list):
+                        results.extend(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"Sub-query failed: {result}")
+
+        elif plan.strategy == SearchStrategy.API_FIRST:
+            # Execute API queries first
+            for sq in sorted_queries:
+                if sq.query_type == "api":
+                    sq_results = await self._execute_sub_query(sq, project_ids, top_k)
+                    results.extend(sq_results)
+
+            # Then vector search if we need more results
+            if len(results) < top_k:
+                for sq in sorted_queries:
+                    if sq.query_type == "vector":
+                        sq_results = await self._execute_sub_query(
+                            sq, project_ids, top_k - len(results)
+                        )
+                        results.extend(sq_results)
+
+        elif plan.strategy == SearchStrategy.VECTOR_FIRST:
+            # Execute vector queries first
+            for sq in sorted_queries:
+                if sq.query_type == "vector":
+                    sq_results = await self._execute_sub_query(sq, project_ids, top_k)
+                    results.extend(sq_results)
+
+            # Then API if needed
+            if len(results) < top_k // 2:  # Less aggressive API fallback
+                for sq in sorted_queries:
+                    if sq.query_type == "api":
+                        sq_results = await self._execute_sub_query(
+                            sq, project_ids, top_k - len(results)
+                        )
+                        results.extend(sq_results)
+
+        elif plan.strategy == SearchStrategy.API_ONLY:
+            for sq in sorted_queries:
+                if sq.query_type == "api":
+                    sq_results = await self._execute_sub_query(sq, project_ids, top_k)
+                    results.extend(sq_results)
+
+        elif plan.strategy == SearchStrategy.VECTOR_ONLY:
+            for sq in sorted_queries:
+                if sq.query_type == "vector":
+                    sq_results = await self._execute_sub_query(sq, project_ids, top_k)
+                    results.extend(sq_results)
+
+        else:  # CODE_DEEP or fallback
+            # Execute all non-code-analysis queries
+            for sq in sorted_queries:
+                if sq.query_type != "code_analysis":
+                    sq_results = await self._execute_sub_query(sq, project_ids, top_k)
+                    results.extend(sq_results)
+
+        # Apply content priority weighting
+        results = self._apply_content_priority(results, plan.content_priority)
+
+        # Deduplicate and rank
+        ranked_results = self._rank_and_dedupe(results, plan.original_query)
+
+        return ranked_results[:top_k]
+
+    async def _execute_sub_query(
+        self,
+        sub_query: SubQuery,
+        project_ids: Optional[List[int]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """Execute a single sub-query."""
+        try:
+            if sub_query.query_type == "vector":
+                return self.embedding_service.search(
+                    query=sub_query.query,
+                    project_ids=project_ids,
+                    content_types=sub_query.content_types,
+                    top_k=top_k,
+                )
+
+            elif sub_query.query_type == "api":
+                return await self._execute_api_query(sub_query, project_ids)
+
+            else:
+                logger.warning(f"Unknown sub-query type: {sub_query.query_type}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Sub-query execution failed: {e}")
+            return []
+
+    async def _execute_api_query(
+        self,
+        sub_query: SubQuery,
+        project_ids: Optional[List[int]],
+    ) -> List[Dict[str, Any]]:
+        """Execute an API-based sub-query."""
+        results = []
+        params = sub_query.params
+
+        if not project_ids:
+            return results
+
+        for project_id in project_ids[:3]:  # Limit to first 3 projects
+            try:
+                if sub_query.action == "get_issue":
+                    issue_iid = params.get("issue_iid")
+                    if issue_iid:
+                        issue = await self.gitlab_client.get_issue(project_id, issue_iid)
+                        results.append(self._format_issue_result(issue, project_id))
+
+                elif sub_query.action == "get_mr":
+                    mr_iid = params.get("mr_iid")
+                    if mr_iid:
+                        mr = await self.gitlab_client.get_merge_request(project_id, mr_iid)
+                        results.append(self._format_mr_result(mr, project_id))
+
+                elif sub_query.action == "search_issues":
+                    issues = await self.gitlab_client.get_issues(
+                        project_id,
+                        labels=params.get("labels"),
+                        state=params.get("state", "all"),
+                        search=params.get("search"),
+                        created_after=params.get("created_after"),
+                        updated_after=params.get("updated_after"),
+                    )
+                    for issue in issues[:5]:
+                        results.append(self._format_issue_result(issue, project_id))
+
+                elif sub_query.action == "search_mrs":
+                    mrs = await self.gitlab_client.get_merge_requests(
+                        project_id,
+                        labels=params.get("labels"),
+                        state=params.get("state", "all"),
+                        search=params.get("search"),
+                        updated_after=params.get("updated_after"),
+                    )
+                    for mr in mrs[:5]:
+                        results.append(self._format_mr_result(mr, project_id))
+
+            except Exception as e:
+                logger.warning(f"API query failed for project {project_id}: {e}")
+
+        return results
+
     async def _query_gitlab_api(
         self, filters: Dict[str, Any], project_ids: List[int]
     ) -> List[Dict[str, Any]]:
-        """Query GitLab API for fresh data."""
+        """Query GitLab API for fresh data (legacy method)."""
         results = []
 
         for project_id in project_ids[:3]:  # Limit to first 3 projects
@@ -154,6 +352,28 @@ Query: "{query}"
                         results.append(self._format_issue_result(issue, project_id))
                 except Exception:
                     pass
+
+        return results
+
+    def _apply_content_priority(
+        self,
+        results: List[Dict[str, Any]],
+        priority: List[str],
+    ) -> List[Dict[str, Any]]:
+        """Boost scores based on content type priority."""
+        if not priority:
+            return results
+
+        # Create priority multipliers (higher priority = higher boost)
+        priority_boost = {
+            content_type: 1.0 + (0.1 * (len(priority) - idx))
+            for idx, content_type in enumerate(priority)
+        }
+
+        for result in results:
+            content_type = result.get("metadata", {}).get("type", "")
+            boost = priority_boost.get(content_type, 1.0)
+            result["score"] = result.get("score", 0) * boost
 
         return results
 
