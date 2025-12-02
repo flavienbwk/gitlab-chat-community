@@ -10,6 +10,8 @@
 
 *Ask questions about issues, merge requests, and code in natural language*
 
+![](./homepage.png)
+
 </div>
 
 ---
@@ -31,41 +33,36 @@
 - GitLab Personal Access Token (PAT) with `read_api` scope
 - OpenAI API key (for chat inference)
 
-### 1. Clone & Configure
+1. Clone & configure
 
-```bash
-git clone <repository-url>
-cd gitlab-chat-community
+    ```bash
+    git clone https://github.com/flavienbwk/gitlab-chat-community
+    cp .env.example .env
+    ```
 
-# Copy environment template
-cp .env.example .env
-```
+2. Edit `.env` with your credentials
 
-### 2. Edit `.env` with your credentials
+    ```env
+    # Required
+    GITLAB_URL=https://gitlab.example.com
+    GITLAB_PAT=glpat-xxxxxxxxxxxx
+    OPENAI_API_KEY=sk-xxxxxxxxxxxx
 
-```env
-# Required
-GITLAB_URL=https://gitlab.example.com
-GITLAB_PAT=glpat-xxxxxxxxxxxx
-OPENAI_API_KEY=sk-xxxxxxxxxxxx
+    # Optional: Use local embeddings instead of OpenAI
+    EMBEDDING_PROVIDER=local  # or "openai"
+    ```
 
-# Optional: Use local embeddings instead of OpenAI
-EMBEDDING_PROVIDER=local  # or "openai"
-```
+3. Start the application and configure it
 
-### 3. Start the application
+    ```bash
+    make dev-build
+    ```
 
-```bash
-# Start all services
-make dev
+    Go to Settings bottom left to configure LLM keys.
 
-# Or with rebuild
-make dev-build
-```
+4. Access the UI
 
-### 4. Access the UI
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
@@ -116,6 +113,44 @@ LOCAL_EMBEDDING_ENABLE_CUDA=1  # If you have a GPU
 | `EMBEDDING_PROVIDER` | `openai` or `local` | `openai` |
 | `CHUNK_SIZE` | Token chunk size | `512` |
 | `TOP_K_RESULTS` | Search results count | `10` |
+
+## Features
+
+### Phase 5: UX and production
+
+- [x] Models selection with open-source capabilities
+- [x] Prod configuration
+
+### Phase 4: Code Analysis
+
+- [x] Implement repository cloning
+- [x] Build code analysis agent
+- [x] Add code search tools
+- [x] Integrate with chat flow
+
+### Phase 3: RAG Chat
+
+- [x] Build hybrid retrieval system
+- [x] Implement LLM agent with tools
+- [x] Create chat API endpoints
+- [x] Build chat interface components
+- [x] Add conversation history
+
+### Phase 2: Indexing Pipeline
+
+- [x] Implement chunking strategies
+- [x] Set up Qdrant collections
+- [x] Create embedding service
+- [x] Build Celery indexing tasks
+- [x] Implement project selection UI
+
+### Phase 1: Foundation
+
+- [x] Set up Docker Compose environment
+- [x] Create FastAPI backend skeleton
+- [x] Set up PostgreSQL with Alembic migrations
+- [x] Implement GitLab API client
+- [x] Create basic Next.js frontend
 
 ---
 

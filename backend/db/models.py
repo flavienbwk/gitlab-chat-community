@@ -43,6 +43,9 @@ class Project(Base):
     last_indexed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    last_indexed_commit: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True
+    )  # Git commit SHA for incremental code indexing
     indexing_status: Mapped[str] = mapped_column(String(50), default="pending")
     indexing_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

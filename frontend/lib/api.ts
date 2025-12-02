@@ -23,7 +23,8 @@ import type {
   VectorCountsResponse,
 } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// In production (nginx), API is on same origin. In development, use configured URL.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 /**
  * Generic fetch wrapper with error handling
@@ -264,10 +265,19 @@ export const api = {
   },
 
   /**
-   * Trigger indexing for a project
+   * Trigger full indexing for a project
    */
   async indexProject(id: number): Promise<IndexProjectResponse> {
     return fetchApi<IndexProjectResponse>(`/api/projects/${id}/index`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Trigger incremental sync for a project (faster than full index)
+   */
+  async syncProject(id: number): Promise<IndexProjectResponse> {
+    return fetchApi<IndexProjectResponse>(`/api/projects/${id}/sync`, {
       method: 'POST',
     });
   },

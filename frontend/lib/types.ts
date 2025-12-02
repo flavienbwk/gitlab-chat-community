@@ -12,8 +12,9 @@ export interface Project {
   default_branch: string;
   is_indexed: boolean;
   is_selected: boolean;
-  indexing_status: 'pending' | 'indexing' | 'completed' | 'error' | 'stopped';
+  indexing_status: 'pending' | 'indexing' | 'syncing' | 'completed' | 'error' | 'stopped';
   indexing_error: string | null;
+  last_indexed_at: string | null;
 }
 
 export interface ProjectListResponse {
@@ -89,6 +90,7 @@ export interface IndexProjectResponse {
   project_id: number;
   task_id?: string;
   message?: string;
+  mode?: 'full' | 'incremental';
 }
 
 export interface DeleteConversationResponse {

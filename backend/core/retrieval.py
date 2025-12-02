@@ -27,16 +27,16 @@ Return a JSON object with these optional fields:
 
 Examples:
 Query: "Issues labeled 'bug' created last month"
-Output: {"labels": ["bug"], "date_filter": {"after": "2024-01-01"}, "content_types": ["issue"]}
+Output: {{"labels": ["bug"], "date_filter": {{"after": "2024-01-01"}}, "content_types": ["issue"]}}
 
 Query: "What is issue #123 about?"
-Output: {"issue_iid": 123, "content_types": ["issue"], "needs_api_query": true}
+Output: {{"issue_iid": 123, "content_types": ["issue"], "needs_api_query": true}}
 
 Query: "Code that handles authentication"
-Output: {"search_terms": "authentication", "content_types": ["code"]}
+Output: {{"search_terms": "authentication", "content_types": ["code"]}}
 
 Query: "Recent merge requests by John"
-Output: {"content_types": ["merge_request"], "search_terms": "John"}
+Output: {{"content_types": ["merge_request"], "search_terms": "John"}}
 
 Now analyze this query and return only the JSON object:
 Query: "{query}"

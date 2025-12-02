@@ -1,3 +1,6 @@
+# Production Docker Compose configuration
+# Usage: make prod or docker compose -f prod.docker-compose.yml up -d
+
 services:
   # Nginx reverse proxy with basic auth
   nginx:
@@ -10,10 +13,13 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -23,22 +29,20 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     expose:
       - "3000"
     environment:
-      - NEXT_PUBLIC_API_URL=
-      - WATCHPACK_POLLING=true
-    volumes:
-      # Mount source code for hot reloading
-      - ./frontend:/app
-      # Preserve node_modules from container
-      - /app/node_modules
-      - /app/.next
-    depends_on:
-      - backend
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -48,14 +52,14 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     expose:
       - "8000"
     environment:
       # GitLab
       - GITLAB_URL=${GITLAB_URL}
       - GITLAB_PAT=${GITLAB_PAT}
-      # Embeddings (LLM providers are configured via UI)
+      # Embeddings
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
@@ -77,9 +81,7 @@ services:
       - CHUNK_OVERLAP=${CHUNK_OVERLAP:-50}
       - TOP_K_RESULTS=${TOP_K_RESULTS:-10}
     volumes:
-      # Mount source code for hot reloading
-      - ./backend:/app
-      # Persistent volume for cloned repos
+      # Persistent volume for cloned repos only (no source mount)
       - repos_data:/app/repos
     depends_on:
       postgres:
@@ -88,8 +90,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -99,13 +108,13 @@ services:
   celery_worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     command: celery -A tasks.celery_app worker -l info -Q indexing,code_analysis,gitlab_sync --concurrency=${CELERY_CONCURRENCY:-4}
     environment:
       # GitLab
       - GITLAB_URL=${GITLAB_URL}
       - GITLAB_PAT=${GITLAB_PAT}
-      # Embeddings (LLM providers are configured via UI)
+      # Embeddings
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
@@ -127,9 +136,6 @@ services:
       - CHUNK_OVERLAP=${CHUNK_OVERLAP:-50}
       - TOP_K_RESULTS=${TOP_K_RESULTS:-10}
     volumes:
-      # Mount source code for development
-      - ./backend:/app
-      # Persistent volume for cloned repos
       - repos_data:/app/repos
     depends_on:
       postgres:
@@ -140,23 +146,23 @@ services:
         condition: service_healthy
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Local embedding service (optional - enable by setting EMBEDDING_PROVIDER=local)
-  # Change LOCAL_EMBEDDING_MODEL in .env to switch models (see EMBEDDING_MODELS.md)
+  # Local embedding service (optional - enable with EMBEDDING_PROVIDER=local)
   embedding-server:
     image: cr.weaviate.io/semitechnologies/transformers-inference:${LOCAL_EMBEDDING_MODEL:-baai-bge-base-en-v1.5}
     environment:
       LOCAL_EMBEDDING_ENABLE_CUDA: "${LOCAL_EMBEDDING_ENABLE_CUDA:-0}"
     profiles:
       - local-embeddings
-    restart: unless-stopped
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -178,6 +184,7 @@ services:
       retries: 5
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -195,6 +202,7 @@ services:
       retries: 5
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -203,6 +211,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -212,6 +221,7 @@ services:
       retries: 5
     networks:
       - gitlab-chat-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:

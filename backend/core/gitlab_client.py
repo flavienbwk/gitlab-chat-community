@@ -91,6 +91,8 @@ class GitLabClient:
         search: Optional[str] = None,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None,
         page: int = 1,
         per_page: int = 100,
     ) -> List[Dict]:
@@ -110,6 +112,10 @@ class GitLabClient:
             params["created_after"] = created_after
         if created_before:
             params["created_before"] = created_before
+        if updated_after:
+            params["updated_after"] = updated_after
+        if updated_before:
+            params["updated_before"] = updated_before
 
         return await self._request(
             "GET", f"/projects/{project_id}/issues", params=params
@@ -119,6 +125,12 @@ class GitLabClient:
         """Get all issues for a project with pagination."""
         params = {"state": "all", "per_page": 100, **kwargs}
         return await self._paginate(f"/projects/{project_id}/issues", params)
+
+    async def get_issue_ids(self, project_id: int) -> List[int]:
+        """Get all issue IDs for a project (for deletion detection)."""
+        params = {"state": "all", "per_page": 100}
+        issues = await self._paginate(f"/projects/{project_id}/issues", params)
+        return [issue["id"] for issue in issues]
 
     async def get_issue(self, project_id: int, issue_iid: int) -> Dict:
         """Get single issue."""
@@ -150,6 +162,8 @@ class GitLabClient:
         state: str = "all",
         labels: Optional[List[str]] = None,
         search: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None,
         page: int = 1,
         per_page: int = 100,
     ) -> List[Dict]:
@@ -165,6 +179,10 @@ class GitLabClient:
             params["labels"] = ",".join(labels)
         if search:
             params["search"] = search
+        if updated_after:
+            params["updated_after"] = updated_after
+        if updated_before:
+            params["updated_before"] = updated_before
 
         return await self._request(
             "GET", f"/projects/{project_id}/merge_requests", params=params
@@ -174,6 +192,12 @@ class GitLabClient:
         """Get all merge requests for a project with pagination."""
         params = {"state": "all", "per_page": 100, **kwargs}
         return await self._paginate(f"/projects/{project_id}/merge_requests", params)
+
+    async def get_mr_ids(self, project_id: int) -> List[int]:
+        """Get all merge request IDs for a project (for deletion detection)."""
+        params = {"state": "all", "per_page": 100}
+        mrs = await self._paginate(f"/projects/{project_id}/merge_requests", params)
+        return [mr["id"] for mr in mrs]
 
     async def get_merge_request(self, project_id: int, mr_iid: int) -> Dict:
         """Get single merge request."""

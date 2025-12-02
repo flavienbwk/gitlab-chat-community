@@ -1,10 +1,11 @@
 """Project API routes."""
 
+from datetime import datetime
 from typing import List, Optional
 
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from api.dependencies import get_gitlab_client, get_project_repo
 from core.embedding import EmbeddingService
@@ -12,7 +13,7 @@ from core.gitlab_client import GitLabClient
 from db.repositories import ProjectRepository
 from tasks.celery_app import celery_app
 from tasks.indexing import index_project
-from tasks.sync import refresh_projects
+from tasks.sync import refresh_projects, sync_project
 
 router = APIRouter()
 
@@ -30,9 +31,16 @@ class ProjectResponse(BaseModel):
     is_selected: bool
     indexing_status: str
     indexing_error: Optional[str] = None
+    last_indexed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+    @field_serializer('last_indexed_at')
+    def serialize_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.isoformat()
 
 
 class ProjectListResponse(BaseModel):
@@ -179,17 +187,21 @@ async def trigger_indexing(
     project_id: int,
     project_repo: ProjectRepository = Depends(get_project_repo),
 ):
-    """Trigger indexing for a project."""
+    """Trigger full indexing for a project.
+
+    This performs a complete re-index of all issues, MRs, and code.
+    For incremental updates, use /sync instead.
+    """
     project = await project_repo.get_by_id(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Check if already indexing
-    if project.indexing_status == "indexing":
+    if project.indexing_status in ("indexing", "syncing"):
         return {
             "status": "already_indexing",
             "project_id": project_id,
-            "message": "Project is already being indexed",
+            "message": "Project is already being indexed or synced",
         }
 
     # Trigger async indexing task
@@ -199,6 +211,46 @@ async def trigger_indexing(
         "status": "started",
         "project_id": project_id,
         "task_id": str(task.id),
+        "mode": "full",
+    }
+
+
+@router.post("/projects/{project_id}/sync")
+async def trigger_sync(
+    project_id: int,
+    project_repo: ProjectRepository = Depends(get_project_repo),
+):
+    """Trigger incremental sync for a project.
+
+    This only indexes new/updated issues, MRs, and code changes since
+    the last indexing. Much faster than full indexing for active projects.
+
+    If the project has never been indexed, this will trigger a full index.
+    """
+    project = await project_repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check if already indexing/syncing
+    if project.indexing_status in ("indexing", "syncing"):
+        return {
+            "status": "already_indexing",
+            "project_id": project_id,
+            "message": "Project is already being indexed or synced",
+        }
+
+    # If never indexed, inform user that full index will run
+    mode = "incremental" if project.is_indexed else "full"
+
+    # Trigger async sync task
+    task = sync_project.delay(project_id)
+
+    return {
+        "status": "started",
+        "project_id": project_id,
+        "task_id": str(task.id),
+        "mode": mode,
+        "message": "Incremental sync started" if mode == "incremental" else "Full index started (project was never indexed)",
     }
 
 

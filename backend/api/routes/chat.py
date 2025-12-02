@@ -112,6 +112,7 @@ async def chat(
     async def generate():
         """Generate streaming response."""
         full_response = ""
+        generated_title = None
 
         try:
             async for token in agent.chat_stream(
@@ -137,11 +138,15 @@ async def chat(
 
                 # Generate title for new conversations
                 if is_new_conversation:
-                    title = await agent.generate_title(request.message)
-                    await conv_repo.update_title(conversation_id, title)
-                    yield {"event": "title", "data": title}
+                    generated_title = await agent.generate_title(request.message)
+                    await conv_repo.update_title(conversation_id, generated_title)
 
                 await session.commit()
+
+            # Yield title and done events outside the async with block
+            # to ensure they are properly sent
+            if generated_title:
+                yield {"event": "title", "data": generated_title}
 
             yield {"event": "done", "data": str(conversation_id)}
 

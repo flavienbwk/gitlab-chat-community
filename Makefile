@@ -1,4 +1,4 @@
-.PHONY: dev dev-build logs down clean migrate migrate-new test shell-backend shell-frontend celery-monitor rebuild-backend rebuild-frontend help
+.PHONY: dev dev-build logs down clean migrate migrate-new test shell-backend shell-frontend celery-monitor rebuild-backend rebuild-frontend prod prod-build prod-down prod-logs help
 
 # Load .env file if it exists
 -include .env
@@ -13,15 +13,21 @@ endif
 
 # Default target
 help:
-	@echo "GitLab Chat Community - Development Commands"
+	@echo "GitLab Chat Community - Commands"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Development:"
-	@echo "  dev            Start all services (auto-detects EMBEDDING_PROVIDER)"
+	@echo "  dev            Start all services for development (with hot reload)"
 	@echo "  dev-build      Start all services with rebuild"
 	@echo "  logs           Follow logs from all services"
 	@echo "  down           Stop all services"
+	@echo ""
+	@echo "Production:"
+	@echo "  prod           Start production stack (with nginx, basic auth)"
+	@echo "  prod-build     Build and start production stack"
+	@echo "  prod-down      Stop production stack"
+	@echo "  prod-logs      Follow logs from production stack"
 	@echo ""
 	@echo "Database:"
 	@echo "  migrate        Run database migrations"
@@ -101,3 +107,19 @@ rebuild-backend:
 
 rebuild-frontend:
 	docker compose $(COMPOSE_PROFILES) up --build -d frontend
+
+# Production
+prod:
+	docker compose -f prod.docker-compose.yml $(COMPOSE_PROFILES) up -d
+
+prod-build:
+	docker compose -f prod.docker-compose.yml $(COMPOSE_PROFILES) up -d --build
+
+prod-down:
+	docker compose -f prod.docker-compose.yml $(COMPOSE_PROFILES) down
+
+prod-logs:
+	docker compose -f prod.docker-compose.yml $(COMPOSE_PROFILES) logs -f
+
+prod-migrate:
+	docker compose -f prod.docker-compose.yml exec backend alembic upgrade head

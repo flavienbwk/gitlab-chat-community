@@ -4,13 +4,20 @@ const nextConfig = {
   reactStrictMode: true,
 
   // API rewrites for development
+  // In production (with nginx), API is served from same origin at /api
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
-      },
-    ];
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    // Only rewrite if NEXT_PUBLIC_API_URL is set (development mode)
+    if (apiUrl) {
+      return [
+        {
+          source: '/api/:path*',
+          destination: `${apiUrl}/api/:path*`,
+        },
+      ];
+    }
+    // In production, no rewrites needed - nginx handles routing
+    return [];
   },
 };
 

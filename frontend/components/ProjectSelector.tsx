@@ -13,6 +13,7 @@ export default function ProjectSelector() {
     refreshProjects,
     toggleProjectSelection,
     indexProject,
+    syncProject,
     stopIndexing,
     clearIndex,
   } = useProjects();
@@ -139,6 +140,13 @@ export default function ProjectSelector() {
                 </div>
               )}
 
+              {/* Last indexed time */}
+              {project.last_indexed_at && (
+                <div className="text-xs text-gray-400 mb-2">
+                  Last indexed: {new Date(project.last_indexed_at).toLocaleDateString()}
+                </div>
+              )}
+
               {/* Status & Actions */}
               <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                 <IndexingStatus
@@ -149,7 +157,7 @@ export default function ProjectSelector() {
                 />
 
                 <div className="flex items-center gap-2">
-                  {project.indexing_status === 'indexing' ? (
+                  {project.indexing_status === 'indexing' || project.indexing_status === 'syncing' ? (
                     <button
                       onClick={() => stopIndexing(project.id)}
                       className="text-xs font-medium text-red-600 hover:text-red-800"
@@ -158,12 +166,31 @@ export default function ProjectSelector() {
                     </button>
                   ) : (
                     <>
-                      <button
-                        onClick={() => indexProject(project.id)}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800"
-                      >
-                        {project.is_indexed ? 'Re-index' : 'Index'}
-                      </button>
+                      {project.is_indexed ? (
+                        <>
+                          <button
+                            onClick={() => syncProject(project.id)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                            title="Quick sync: only fetch new/updated content"
+                          >
+                            Sync
+                          </button>
+                          <button
+                            onClick={() => indexProject(project.id)}
+                            className="text-xs font-medium text-gray-500 hover:text-gray-700"
+                            title="Full re-index: fetch all content"
+                          >
+                            Full
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => indexProject(project.id)}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                        >
+                          Index
+                        </button>
+                      )}
                       {project.is_indexed && (
                         <button
                           onClick={() => {
@@ -171,7 +198,7 @@ export default function ProjectSelector() {
                               clearIndex(project.id);
                             }
                           }}
-                          className="text-xs font-medium text-gray-500 hover:text-red-600"
+                          className="text-xs font-medium text-gray-400 hover:text-red-600"
                           title="Clear indexed data"
                         >
                           Clear

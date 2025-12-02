@@ -156,6 +156,20 @@ export default function ChatInterface() {
             </svg>
             Clear History
           </button>
+
+          <div className="pt-3 mt-3 border-t border-gray-100 text-center">
+            <span className="text-xs text-gray-400">
+              Built by{' '}
+              <a
+                href="https://berwick.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-500 hover:text-blue-600 transition-colors"
+              >
+                Flavien Berwick
+              </a>
+            </span>
+          </div>
         </div>
       </div>
 

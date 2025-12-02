@@ -1,6 +1,7 @@
 """Chat agent with RAG and streaming support."""
 
 import json
+import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import anthropic
@@ -9,6 +10,8 @@ from openai import OpenAI
 from config import get_settings
 from core.code_analysis import CodeAnalysisAgent
 from core.retrieval import HybridRetriever
+
+logger = logging.getLogger(__name__)
 
 
 class ChatAgent:
@@ -249,27 +252,57 @@ Context will be provided from the search results. Use this context to answer the
 
     async def generate_title(self, first_message: str) -> str:
         """Generate a title for a conversation based on the first message."""
-        if self.provider_type == "anthropic":
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=50,
-                system="Generate a short, descriptive title (max 50 chars) for a conversation that starts with the following message. Return only the title, no quotes or punctuation.",
-                messages=[{"role": "user", "content": first_message}],
-            )
-            title = response.content[0].text if response.content else "New Conversation"
-        else:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Generate a short, descriptive title (max 50 chars) for a conversation that starts with the following message. Return only the title, no quotes or punctuation.",
-                    },
-                    {"role": "user", "content": first_message},
-                ],
-                temperature=0.7,
-                max_tokens=50,
-            )
-            title = response.choices[0].message.content or "New Conversation"
+        import sys
 
-        return title[:50]  # Ensure max length
+        # Better prompt that works with various models
+        title_prompt = """Your task is to create a short title (3-6 words) that summarizes this user message.
+
+Examples:
+- "How do I fix the login bug?" → "Login Bug Fix Help"
+- "What are the latest updates to the API?" → "API Updates Inquiry"
+- "Tell me about the authentication system" → "Authentication System Overview"
+- "Hello, I need help with deployment" → "Deployment Help Request"
+
+User message: {message}
+
+Title:"""
+
+        try:
+            if self.provider_type == "anthropic":
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=30,
+                    messages=[{"role": "user", "content": title_prompt.format(message=first_message)}],
+                )
+                title = response.content[0].text.strip() if response.content else ""
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "user", "content": title_prompt.format(message=first_message)},
+                    ],
+                    temperature=0.3,
+                    max_tokens=30,
+                )
+                title = (response.choices[0].message.content or "").strip()
+
+            # Clean up the title - remove quotes, "Title:" prefix, etc.
+            title = title.strip('"\'')
+            if title.lower().startswith("title:"):
+                title = title[6:].strip()
+
+            # Fallback if empty or too generic
+            if not title or title.lower() in ("new conversation", "untitled", "chat"):
+                # Generate a simple title from the message
+                words = first_message.split()[:5]
+                title = " ".join(words)
+                if len(title) > 40:
+                    title = title[:40] + "..."
+
+            print(f"[Title] '{first_message[:30]}...' -> '{title}'", file=sys.stderr)
+            return title[:50]
+        except Exception as e:
+            print(f"[Title Error] {e}", file=sys.stderr)
+            # Fallback: use first few words of message
+            words = first_message.split()[:4]
+            return " ".join(words)[:50] or "Chat"

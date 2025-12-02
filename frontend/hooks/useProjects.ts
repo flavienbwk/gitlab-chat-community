@@ -16,6 +16,7 @@ interface UseProjectsReturn {
   deselectProject: (id: number) => Promise<void>;
   toggleProjectSelection: (id: number) => Promise<void>;
   indexProject: (id: number) => Promise<void>;
+  syncProject: (id: number) => Promise<void>;
   stopIndexing: (id: number) => Promise<void>;
   clearIndex: (id: number) => Promise<void>;
   getProjectStatus: (id: number) => Promise<void>;
@@ -121,6 +122,39 @@ export function useProjects(): UseProjectsReturn {
     [projects, selectProject, deselectProject]
   );
 
+  // Shared polling function for indexing/syncing
+  const pollIndexingStatus = useCallback(
+    async (id: number) => {
+      try {
+        const status = await api.getIndexingStatus(id);
+
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  indexing_status: status.status as Project['indexing_status'],
+                  is_indexed: status.is_indexed,
+                  indexing_error: status.error,
+                }
+              : p
+          )
+        );
+
+        // Continue polling if still indexing or syncing
+        if (status.status === 'indexing' || status.status === 'syncing') {
+          setTimeout(() => pollIndexingStatus(id), 3000);
+        } else {
+          // Refresh vector counts when complete
+          loadVectorCounts();
+        }
+      } catch (err) {
+        console.error('Failed to poll indexing status:', err);
+      }
+    },
+    [loadVectorCounts]
+  );
+
   const indexProject = useCallback(async (id: number) => {
     try {
       setError(null);
@@ -134,38 +168,8 @@ export function useProjects(): UseProjectsReturn {
 
       await api.indexProject(id);
 
-      // Poll for status updates
-      const pollStatus = async () => {
-        try {
-          const status = await api.getIndexingStatus(id);
-
-          setProjects((prev) =>
-            prev.map((p) =>
-              p.id === id
-                ? {
-                    ...p,
-                    indexing_status: status.status as Project['indexing_status'],
-                    is_indexed: status.is_indexed,
-                    indexing_error: status.error,
-                  }
-                : p
-            )
-          );
-
-          // Continue polling if still indexing
-          if (status.status === 'indexing') {
-            setTimeout(pollStatus, 3000);
-          } else {
-            // Refresh vector counts when indexing completes
-            loadVectorCounts();
-          }
-        } catch (err) {
-          console.error('Failed to poll indexing status:', err);
-        }
-      };
-
       // Start polling after a short delay
-      setTimeout(pollStatus, 2000);
+      setTimeout(() => pollIndexingStatus(id), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start indexing');
 
@@ -176,7 +180,34 @@ export function useProjects(): UseProjectsReturn {
         )
       );
     }
-  }, []);
+  }, [pollIndexingStatus]);
+
+  const syncProject = useCallback(async (id: number) => {
+    try {
+      setError(null);
+
+      // Update local state to show syncing
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, indexing_status: 'syncing' as const } : p
+        )
+      );
+
+      await api.syncProject(id);
+
+      // Start polling after a short delay
+      setTimeout(() => pollIndexingStatus(id), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start sync');
+
+      // Revert status on error
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, indexing_status: 'error' as const } : p
+        )
+      );
+    }
+  }, [pollIndexingStatus]);
 
   const getProjectStatus = useCallback(async (id: number) => {
     try {
@@ -250,6 +281,7 @@ export function useProjects(): UseProjectsReturn {
     deselectProject,
     toggleProjectSelection,
     indexProject,
+    syncProject,
     stopIndexing,
     clearIndex,
     getProjectStatus,

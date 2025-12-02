@@ -419,6 +419,16 @@ def clone_and_index_code(
                 logger.warning(f"Failed to index {file_path}: {e}")
                 continue
 
+        # Get current git commit for incremental sync support
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+        current_commit = result.stdout.strip() if result.returncode == 0 else None
+
         # Track code indexing
         with get_sync_session() as session:
             existing = (
@@ -441,6 +451,15 @@ def clone_and_index_code(
                     qdrant_point_ids=all_point_ids,
                 )
                 session.add(item)
+
+            # Update last indexed commit for future incremental syncs
+            if current_commit:
+                session.execute(
+                    update(Project)
+                    .where(Project.id == project_id)
+                    .values(last_indexed_commit=current_commit)
+                )
+
             session.commit()
 
         logger.info(f"Indexed {files_indexed} code files for project {project_id}")
