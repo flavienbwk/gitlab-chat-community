@@ -68,6 +68,9 @@ Thumbs.db
 # Docker
 .docker/
 
+# Celery
+celerybeat-schedule
+
 # Alembic
 alembic/versions/__pycache__/
 
