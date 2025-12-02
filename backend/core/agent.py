@@ -22,6 +22,14 @@ When answering:
 4. For code questions, include relevant code snippets when helpful
 5. Provide links when available (web_url fields)
 
+IMPORTANT: Always format your responses using Markdown syntax (not HTML). Use:
+- **bold** for emphasis
+- `backticks` for inline code
+- ```language for code blocks
+- [text](url) for links
+- - or * for bullet lists
+- 1. 2. 3. for numbered lists
+
 Context will be provided from the search results. Use this context to answer the user's question accurately."""
 
     def __init__(self):

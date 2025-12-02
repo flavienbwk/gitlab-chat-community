@@ -71,7 +71,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A tasks.celery_app worker -l info -Q indexing,code_analysis,gitlab_sync
+    command: celery -A tasks.celery_app worker -l info -Q indexing,code_analysis,gitlab_sync --concurrency=${CELERY_CONCURRENCY:-4}
     environment:
       # GitLab
       - GITLAB_URL=${GITLAB_URL}

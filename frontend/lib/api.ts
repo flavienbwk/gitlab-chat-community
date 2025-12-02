@@ -92,10 +92,57 @@ export const api = {
 
     let buffer = '';
 
+    // Helper to process a single SSE event
+    const processEvent = (event: string) => {
+      if (!event.trim()) return;
+
+      const lines = event.split(/\r?\n/);
+      let eventType = 'message';
+      const dataLines: string[] = [];
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          // Preserve the space after "data: " if present
+          let lineData = line.slice(5);
+          if (lineData.startsWith(' ')) {
+            lineData = lineData.slice(1);
+          }
+          dataLines.push(lineData);
+        }
+      }
+
+      // Join multiple data lines with newlines (per SSE spec)
+      const data = dataLines.join('\n');
+
+      if (data === '[DONE]') return;
+
+      switch (eventType) {
+        case 'message':
+          // Empty data represents a newline from the LLM
+          onToken(data === '' ? '\n' : data);
+          break;
+        case 'title':
+          onTitle(data);
+          break;
+        case 'done':
+          onDone(data);
+          break;
+        case 'error':
+          onError(data);
+          break;
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
 
       if (done) {
+        // Process any remaining data in buffer when stream ends
+        if (buffer.trim()) {
+          processEvent(buffer);
+        }
         break;
       }
 
@@ -107,40 +154,7 @@ export const api = {
       buffer = events.pop() || ''; // Keep incomplete event in buffer
 
       for (const event of events) {
-        if (!event.trim()) continue;
-
-        const lines = event.split(/\r?\n/);
-        let eventType = 'message';
-        let data = '';
-
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            eventType = line.slice(6).trim();
-          } else if (line.startsWith('data:')) {
-            // Preserve the space after "data: " if present
-            data = line.slice(5);
-            if (data.startsWith(' ')) {
-              data = data.slice(1);
-            }
-          }
-        }
-
-        if (data === '[DONE]') continue;
-
-        switch (eventType) {
-          case 'message':
-            onToken(data);
-            break;
-          case 'title':
-            onTitle(data);
-            break;
-          case 'done':
-            onDone(data);
-            break;
-          case 'error':
-            onError(data);
-            break;
-        }
+        processEvent(event);
       }
     }
   },
