@@ -16,6 +16,7 @@ import type {
   ProjectListResponse,
   RefreshProjectsResponse,
   SelectProjectResponse,
+  VectorCountsResponse,
 } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -295,6 +296,13 @@ export const api = {
     return fetchApi(`/api/projects/${id}/clear-index`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * Get vector counts per project from Qdrant
+   */
+  async getVectorCounts(): Promise<VectorCountsResponse> {
+    return fetchApi<VectorCountsResponse>('/api/projects/vector-counts');
   },
 };
 

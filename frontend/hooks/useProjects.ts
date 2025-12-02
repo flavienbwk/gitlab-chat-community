@@ -7,6 +7,7 @@ import type { Project } from '@/lib/types';
 interface UseProjectsReturn {
   projects: Project[];
   selectedProjects: Project[];
+  vectorCounts: Record<number, number>;
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
@@ -22,6 +23,7 @@ interface UseProjectsReturn {
 
 export function useProjects(): UseProjectsReturn {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [vectorCounts, setVectorCounts] = useState<Record<number, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,18 +36,30 @@ export function useProjects(): UseProjectsReturn {
     loadProjects();
   }, []);
 
+  const loadVectorCounts = useCallback(async () => {
+    try {
+      const response = await api.getVectorCounts();
+      setVectorCounts(response.counts);
+    } catch (err) {
+      console.error('Failed to load vector counts:', err);
+    }
+  }, []);
+
   const loadProjects = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.getProjects();
-      setProjects(response.projects);
+      const [projectsResponse] = await Promise.all([
+        api.getProjects(),
+        loadVectorCounts(),
+      ]);
+      setProjects(projectsResponse.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadVectorCounts]);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -141,6 +155,9 @@ export function useProjects(): UseProjectsReturn {
           // Continue polling if still indexing
           if (status.status === 'indexing') {
             setTimeout(pollStatus, 3000);
+          } else {
+            // Refresh vector counts when indexing completes
+            loadVectorCounts();
           }
         } catch (err) {
           console.error('Failed to poll indexing status:', err);
@@ -213,14 +230,18 @@ export function useProjects(): UseProjectsReturn {
             : p
         )
       );
+
+      // Refresh vector counts
+      loadVectorCounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear index');
     }
-  }, []);
+  }, [loadVectorCounts]);
 
   return {
     projects,
     selectedProjects,
+    vectorCounts,
     isLoading,
     isRefreshing,
     error,

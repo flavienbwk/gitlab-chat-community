@@ -268,3 +268,46 @@ class EmbeddingService:
             "points_count": info.points_count,
             "status": info.status,
         }
+
+    def count_by_project(self, project_id: int) -> int:
+        """Count vectors for a specific project."""
+        result = self.qdrant.count(
+            collection_name=self.COLLECTION_NAME,
+            count_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="project_id",
+                        match=MatchValue(value=project_id),
+                    )
+                ]
+            ),
+            exact=True,
+        )
+        return result.count
+
+    def get_all_project_counts(self) -> Dict[int, int]:
+        """Get vector counts for all projects."""
+        counts: Dict[int, int] = {}
+        offset = None
+
+        while True:
+            results, offset = self.qdrant.scroll(
+                collection_name=self.COLLECTION_NAME,
+                limit=1000,
+                offset=offset,
+                with_payload=["project_id"],
+                with_vectors=False,
+            )
+
+            if not results:
+                break
+
+            for point in results:
+                pid = point.payload.get("project_id")
+                if pid is not None:
+                    counts[pid] = counts.get(pid, 0) + 1
+
+            if offset is None:
+                break
+
+        return counts

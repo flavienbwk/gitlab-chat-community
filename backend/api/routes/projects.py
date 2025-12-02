@@ -42,6 +42,13 @@ class ProjectListResponse(BaseModel):
     total: int
 
 
+class VectorCountsResponse(BaseModel):
+    """Vector counts per project."""
+
+    counts: dict[int, int]
+    total: int
+
+
 class IndexingStatusResponse(BaseModel):
     """Indexing status response."""
 
@@ -59,6 +66,17 @@ async def list_projects(
     return ProjectListResponse(
         projects=[ProjectResponse.model_validate(p) for p in projects],
         total=len(projects),
+    )
+
+
+@router.get("/projects/vector-counts", response_model=VectorCountsResponse)
+async def get_vector_counts():
+    """Get vector counts per project from Qdrant."""
+    embedding_service = EmbeddingService()
+    counts = embedding_service.get_all_project_counts()
+    return VectorCountsResponse(
+        counts=counts,
+        total=sum(counts.values()),
     )
 
 
@@ -281,10 +299,10 @@ async def clear_project_index(
         await project_repo.update_status(project_id, "pending", None)
 
         # Clear indexed items from database
-        from db.database import get_async_session
+        from db.database import get_db
         from db.repositories import IndexedItemRepository
 
-        async for session in get_async_session():
+        async for session in get_db():
             indexed_repo = IndexedItemRepository(session)
             await indexed_repo.delete_by_project(project_id)
             await session.commit()

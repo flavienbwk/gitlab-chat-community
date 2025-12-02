@@ -6,6 +6,7 @@ import IndexingStatus from './IndexingStatus';
 export default function ProjectSelector() {
   const {
     projects,
+    vectorCounts,
     isLoading,
     isRefreshing,
     error,
@@ -126,6 +127,16 @@ export default function ProjectSelector() {
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                   {project.description}
                 </p>
+              )}
+
+              {/* Vector count badge */}
+              {vectorCounts[project.gitlab_id] > 0 && (
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                  </svg>
+                  <span>{vectorCounts[project.gitlab_id].toLocaleString()} vectors</span>
+                </div>
               )}
 
               {/* Status & Actions */}

@@ -99,3 +99,8 @@ export interface ClearConversationsResponse {
   status: string;
   message: string;
 }
+
+export interface VectorCountsResponse {
+  counts: Record<number, number>;
+  total: number;
+}
