@@ -1,0 +1,176 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Mount source code for hot reloading
+      - ./frontend:/app
+      # Preserve node_modules from container
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - gitlab-chat-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # GitLab
+      - GITLAB_URL=${GITLAB_URL}
+      - GITLAB_PAT=${GITLAB_PAT}
+      # LLM (for chat/inference)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      # Embeddings
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://t2v-transformers:8080}
+      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-384}
+      # Database
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-gitlab_chat}
+      - POSTGRES_USER=${POSTGRES_USER:-gitlab_chat}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Vector DB
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      # App settings
+      - CHUNK_SIZE=${CHUNK_SIZE:-512}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-50}
+      - TOP_K_RESULTS=${TOP_K_RESULTS:-10}
+    volumes:
+      # Mount source code for hot reloading
+      - ./backend:/app
+      # Persistent volume for cloned repos
+      - repos_data:/app/repos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gitlab-chat-network
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A tasks.celery_app worker -l info -Q indexing,code_analysis,gitlab_sync
+    environment:
+      # GitLab
+      - GITLAB_URL=${GITLAB_URL}
+      - GITLAB_PAT=${GITLAB_PAT}
+      # LLM (for chat/inference)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      # Embeddings
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://t2v-transformers:8080}
+      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-384}
+      # Database
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-gitlab_chat}
+      - POSTGRES_USER=${POSTGRES_USER:-gitlab_chat}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Vector DB
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      # App settings
+      - CHUNK_SIZE=${CHUNK_SIZE:-512}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-50}
+      - TOP_K_RESULTS=${TOP_K_RESULTS:-10}
+    volumes:
+      # Mount source code for development
+      - ./backend:/app
+      # Persistent volume for cloned repos
+      - repos_data:/app/repos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gitlab-chat-network
+
+  # Local embedding service (optional - enable by setting EMBEDDING_PROVIDER=local)
+  t2v-transformers:
+    image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      ENABLE_CUDA: "${ENABLE_CUDA:-0}"
+    profiles:
+      - local-embeddings
+    restart: unless-stopped
+    networks:
+      - gitlab-chat-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-gitlab_chat}
+      - POSTGRES_USER=${POSTGRES_USER:-gitlab_chat}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gitlab_chat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gitlab-chat-network
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gitlab-chat-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gitlab-chat-network
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  repos_data:
+
+networks:
+  gitlab-chat-network:
+    driver: bridge
