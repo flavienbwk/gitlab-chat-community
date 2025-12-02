@@ -34,14 +34,12 @@ services:
       # GitLab
       - GITLAB_URL=${GITLAB_URL}
       - GITLAB_PAT=${GITLAB_PAT}
-      # LLM (for chat/inference)
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      # Embeddings
+      # Embeddings (LLM providers are configured via UI)
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
-      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://t2v-transformers:8080}
-      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-384}
+      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://embedding-server:8080}
+      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-768}
       # Database
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -86,14 +84,12 @@ services:
       # GitLab
       - GITLAB_URL=${GITLAB_URL}
       - GITLAB_PAT=${GITLAB_PAT}
-      # LLM (for chat/inference)
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      # Embeddings
+      # Embeddings (LLM providers are configured via UI)
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
-      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://t2v-transformers:8080}
-      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-384}
+      - LOCAL_EMBEDDING_URL=${LOCAL_EMBEDDING_URL:-http://embedding-server:8080}
+      - LOCAL_EMBEDDING_DIMENSION=${LOCAL_EMBEDDING_DIMENSION:-768}
       # Database
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -130,10 +126,11 @@ services:
         max-file: "3"
 
   # Local embedding service (optional - enable by setting EMBEDDING_PROVIDER=local)
-  t2v-transformers:
-    image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+  # Change LOCAL_EMBEDDING_MODEL in .env to switch models (see EMBEDDING_MODELS.md)
+  embedding-server:
+    image: cr.weaviate.io/semitechnologies/transformers-inference:${LOCAL_EMBEDDING_MODEL:-baai-bge-base-en-v1.5}
     environment:
-      ENABLE_CUDA: "${ENABLE_CUDA:-0}"
+      LOCAL_EMBEDDING_ENABLE_CUDA: "${LOCAL_EMBEDDING_ENABLE_CUDA:-0}"
     profiles:
       - local-embeddings
     restart: unless-stopped

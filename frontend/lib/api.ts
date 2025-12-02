@@ -12,8 +12,12 @@ import type {
   DeleteConversationResponse,
   IndexingStatusResponse,
   IndexProjectResponse,
+  LLMProvider,
+  LLMProviderCreate,
+  LLMProviderUpdate,
   Project,
   ProjectListResponse,
+  ProviderListResponse,
   RefreshProjectsResponse,
   SelectProjectResponse,
   VectorCountsResponse,
@@ -63,7 +67,8 @@ export const api = {
     onToken: (token: string) => void = () => {},
     onTitle: (title: string) => void = () => {},
     onDone: (conversationId: string) => void = () => {},
-    onError: (error: string) => void = () => {}
+    onError: (error: string) => void = () => {},
+    providerId?: number
   ): Promise<void> {
     const url = `${API_BASE}/api/chat`;
 
@@ -76,6 +81,7 @@ export const api = {
       body: JSON.stringify({
         message,
         conversation_id: conversationId,
+        provider_id: providerId,
       }),
     });
 
@@ -303,6 +309,69 @@ export const api = {
    */
   async getVectorCounts(): Promise<VectorCountsResponse> {
     return fetchApi<VectorCountsResponse>('/api/projects/vector-counts');
+  },
+
+  // =====================
+  // LLM Provider endpoints
+  // =====================
+
+  /**
+   * Get all LLM providers
+   */
+  async getProviders(): Promise<ProviderListResponse> {
+    return fetchApi<ProviderListResponse>('/api/providers');
+  },
+
+  /**
+   * Get the default LLM provider
+   */
+  async getDefaultProvider(): Promise<LLMProvider | null> {
+    return fetchApi<LLMProvider | null>('/api/providers/default');
+  },
+
+  /**
+   * Get a specific provider
+   */
+  async getProvider(id: number): Promise<LLMProvider> {
+    return fetchApi<LLMProvider>(`/api/providers/${id}`);
+  },
+
+  /**
+   * Create a new LLM provider
+   */
+  async createProvider(data: LLMProviderCreate): Promise<LLMProvider> {
+    return fetchApi<LLMProvider>('/api/providers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update an LLM provider
+   */
+  async updateProvider(id: number, data: LLMProviderUpdate): Promise<LLMProvider> {
+    return fetchApi<LLMProvider>(`/api/providers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete an LLM provider
+   */
+  async deleteProvider(id: number): Promise<{ status: string; provider_id: number }> {
+    return fetchApi(`/api/providers/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Set a provider as default
+   */
+  async setDefaultProvider(id: number): Promise<LLMProvider> {
+    return fetchApi<LLMProvider>(`/api/providers/${id}/set-default`, {
+      method: 'POST',
+    });
   },
 };
 

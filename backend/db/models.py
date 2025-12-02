@@ -113,6 +113,31 @@ class Message(Base):
     )
 
 
+class LLMProvider(Base):
+    """LLM provider/endpoint configuration."""
+
+    __tablename__ = "llm_providers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # openai, anthropic, custom
+    api_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    model_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    host_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class IndexedItem(Base):
     """Track indexed items in Qdrant."""
 

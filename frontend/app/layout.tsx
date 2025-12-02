@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'GitLab Chat Community',
   description: 'RAG-enabled chatbot for querying GitLab issues, merge requests, and code',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

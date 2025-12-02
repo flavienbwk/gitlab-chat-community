@@ -8,14 +8,14 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from api.dependencies import (
-    get_chat_agent,
     get_conversation_repo,
     get_message_repo,
     get_project_repo,
+    get_provider_repo,
 )
 from core.agent import ChatAgent
 from db.database import async_session_maker
-from db.repositories import ConversationRepository, MessageRepository, ProjectRepository
+from db.repositories import ConversationRepository, LLMProviderRepository, MessageRepository, ProjectRepository
 
 router = APIRouter()
 
@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
 
     message: str
     conversation_id: Optional[str] = None
+    provider_id: Optional[int] = None  # Optional provider ID, uses default if not specified
 
 
 class ChatResponse(BaseModel):
@@ -35,15 +36,45 @@ class ChatResponse(BaseModel):
     title: Optional[str] = None
 
 
+async def _get_agent_for_provider(
+    provider_id: Optional[int],
+    provider_repo: LLMProviderRepository,
+) -> ChatAgent:
+    """Get a ChatAgent configured for the specified or default provider."""
+    provider = None
+
+    if provider_id:
+        provider = await provider_repo.get_by_id(provider_id)
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+    else:
+        # Try to get default provider
+        provider = await provider_repo.get_default()
+
+    if provider:
+        return ChatAgent(
+            provider_type=provider.provider_type,
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            model=provider.model_id,
+        )
+    else:
+        # Fall back to env-based config
+        return ChatAgent()
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
     conversation_repo: ConversationRepository = Depends(get_conversation_repo),
     message_repo: MessageRepository = Depends(get_message_repo),
     project_repo: ProjectRepository = Depends(get_project_repo),
-    agent: ChatAgent = Depends(get_chat_agent),
+    provider_repo: LLMProviderRepository = Depends(get_provider_repo),
 ):
     """Send a chat message and receive a streaming response."""
+
+    # Get agent for provider
+    agent = await _get_agent_for_provider(request.provider_id, provider_repo)
 
     # Get or create conversation
     conversation_id = None
@@ -129,9 +160,12 @@ async def chat_sync(
     conversation_repo: ConversationRepository = Depends(get_conversation_repo),
     message_repo: MessageRepository = Depends(get_message_repo),
     project_repo: ProjectRepository = Depends(get_project_repo),
-    agent: ChatAgent = Depends(get_chat_agent),
+    provider_repo: LLMProviderRepository = Depends(get_provider_repo),
 ):
     """Send a chat message and receive a non-streaming response."""
+
+    # Get agent for provider
+    agent = await _get_agent_for_provider(request.provider_id, provider_repo)
 
     # Get or create conversation
     conversation_id = None

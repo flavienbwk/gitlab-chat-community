@@ -105,13 +105,13 @@ class EmbeddingService:
         return all_embeddings
 
     def _embed_local(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings using local t2v-transformers service."""
+        """Generate embeddings using local embedding-server service."""
         if not texts:
             return []
 
         all_embeddings = []
 
-        # t2v-transformers only supports single text at a time
+        # embedding-server only supports single text at a time
         # POST to /vectors with {"text": "..."}
         with httpx.Client(timeout=120.0) as client:
             for text in texts:

@@ -15,8 +15,9 @@ greenlet==3.0.3
 celery[redis]==5.3.6
 redis==5.0.1
 
-# OpenAI
+# LLM Providers
 openai==2.8.1
+anthropic>=0.39.0
 tiktoken>=0.7.0
 
 # Vector Database

@@ -7,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Conversation, IndexedItem, Message, Project
+from db.models import Conversation, IndexedItem, LLMProvider, Message, Project
 
 
 class ProjectRepository:
@@ -234,5 +234,127 @@ class IndexedItemRepository:
         """Delete all indexed items for a project."""
         await self.session.execute(
             delete(IndexedItem).where(IndexedItem.project_id == project_id)
+        )
+        await self.session.flush()
+
+
+class LLMProviderRepository:
+    """Repository for LLMProvider operations."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_all(self) -> List[LLMProvider]:
+        """Get all LLM providers."""
+        result = await self.session.execute(
+            select(LLMProvider).order_by(LLMProvider.name)
+        )
+        return list(result.scalars().all())
+
+    async def get_by_id(self, provider_id: int) -> Optional[LLMProvider]:
+        """Get provider by ID."""
+        result = await self.session.execute(
+            select(LLMProvider).where(LLMProvider.id == provider_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_default(self) -> Optional[LLMProvider]:
+        """Get the default provider."""
+        result = await self.session.execute(
+            select(LLMProvider).where(LLMProvider.is_default == True)
+        )
+        return result.scalar_one_or_none()
+
+    async def create(
+        self,
+        name: str,
+        provider_type: str,
+        api_key: str,
+        model_id: str,
+        base_url: Optional[str] = None,
+        host_country: Optional[str] = None,
+        is_default: bool = False,
+    ) -> LLMProvider:
+        """Create a new LLM provider."""
+        # If this is the first provider or marked as default, ensure it's the only default
+        if is_default:
+            await self._clear_default()
+
+        provider = LLMProvider(
+            name=name,
+            provider_type=provider_type,
+            api_key=api_key,
+            model_id=model_id,
+            base_url=base_url,
+            host_country=host_country,
+            is_default=is_default,
+        )
+        self.session.add(provider)
+        await self.session.flush()
+        return provider
+
+    async def update(
+        self,
+        provider_id: int,
+        name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model_id: Optional[str] = None,
+        base_url: Optional[str] = None,
+        host_country: Optional[str] = None,
+        is_default: Optional[bool] = None,
+    ) -> Optional[LLMProvider]:
+        """Update an existing provider."""
+        provider = await self.get_by_id(provider_id)
+        if not provider:
+            return None
+
+        if name is not None:
+            provider.name = name
+        if provider_type is not None:
+            provider.provider_type = provider_type
+        if api_key is not None:
+            provider.api_key = api_key
+        if model_id is not None:
+            provider.model_id = model_id
+        if base_url is not None:
+            provider.base_url = base_url if base_url else None
+        if host_country is not None:
+            provider.host_country = host_country if host_country else None
+        if is_default is not None:
+            if is_default:
+                await self._clear_default()
+            provider.is_default = is_default
+
+        await self.session.flush()
+        return provider
+
+    async def delete(self, provider_id: int) -> bool:
+        """Delete a provider."""
+        provider = await self.get_by_id(provider_id)
+        if not provider:
+            return False
+
+        await self.session.execute(
+            delete(LLMProvider).where(LLMProvider.id == provider_id)
+        )
+        await self.session.flush()
+        return True
+
+    async def set_default(self, provider_id: int) -> Optional[LLMProvider]:
+        """Set a provider as default."""
+        provider = await self.get_by_id(provider_id)
+        if not provider:
+            return None
+
+        await self._clear_default()
+        provider.is_default = True
+        await self.session.flush()
+        return provider
+
+    async def _clear_default(self) -> None:
+        """Clear the default flag from all providers."""
+        await self.session.execute(
+            update(LLMProvider).where(LLMProvider.is_default == True).values(is_default=False)
         )
         await self.session.flush()

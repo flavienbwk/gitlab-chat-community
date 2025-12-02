@@ -10,7 +10,7 @@ interface UseChatReturn {
   currentConversation: Conversation | null;
   isLoading: boolean;
   error: string | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, providerId?: number) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   createNewConversation: () => void;
   deleteConversation: (id: string) => Promise<void>;
@@ -66,7 +66,7 @@ export function useChat(): UseChatReturn {
     setError(null);
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, providerId?: number) => {
     if (!content.trim() || isLoading) return;
 
     setIsLoading(true);
@@ -138,7 +138,9 @@ export function useChat(): UseChatReturn {
         // onError
         (errorMsg) => {
           setError(errorMsg);
-        }
+        },
+        // providerId
+        providerId
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');

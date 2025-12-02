@@ -13,6 +13,7 @@ from db.database import get_db
 from db.repositories import (
     ConversationRepository,
     IndexedItemRepository,
+    LLMProviderRepository,
     MessageRepository,
     ProjectRepository,
 )
@@ -64,3 +65,10 @@ def get_retriever() -> HybridRetriever:
 def get_chat_agent() -> ChatAgent:
     """Get chat agent."""
     return ChatAgent()
+
+
+async def get_provider_repo(
+    db: AsyncSession = Depends(get_db),
+) -> LLMProviderRepository:
+    """Get LLM provider repository."""
+    return LLMProviderRepository(db)

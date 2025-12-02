@@ -3,6 +3,7 @@
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+import anthropic
 from openai import OpenAI
 
 from config import get_settings
@@ -32,12 +33,36 @@ IMPORTANT: Always format your responses using Markdown syntax (not HTML). Use:
 
 Context will be provided from the search results. Use this context to answer the user's question accurately."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        provider_type: str = "openai",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
+        """Initialize ChatAgent with provider configuration.
+
+        Args:
+            provider_type: Type of provider (openai, anthropic, custom)
+            api_key: API key for the provider
+            base_url: Base URL for API (custom providers or OpenAI-compatible)
+            model: Model ID to use
+        """
         settings = get_settings()
-        # Only pass base_url if it's actually set (not empty string)
-        base_url = settings.openai_base_url if settings.openai_base_url else None
-        self.openai = OpenAI(api_key=settings.openai_api_key, base_url=base_url)
-        self.model = settings.openai_model
+
+        self.provider_type = provider_type
+        self.model = model or settings.openai_model
+
+        if provider_type == "anthropic":
+            self.client = anthropic.Anthropic(api_key=api_key or settings.openai_api_key)
+        else:
+            # OpenAI or custom (OpenAI-compatible)
+            effective_base_url = base_url if base_url else (settings.openai_base_url if settings.openai_base_url else None)
+            self.client = OpenAI(
+                api_key=api_key or settings.openai_api_key,
+                base_url=effective_base_url,
+            )
+
         self.retriever = HybridRetriever()
         self.code_agent = CodeAnalysisAgent()
 
@@ -142,15 +167,23 @@ Context will be provided from the search results. Use this context to answer the
         user_message = f"Context:\n{context}\n\n---\nUser Question: {query}"
         messages.append({"role": "user", "content": user_message})
 
-        # Get response
-        response = self.openai.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000,
-        )
-
-        return response.choices[0].message.content or "I couldn't generate a response."
+        # Get response based on provider type
+        if self.provider_type == "anthropic":
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2000,
+                system=self.SYSTEM_PROMPT,
+                messages=[m for m in messages if m["role"] != "system"],
+            )
+            return response.content[0].text if response.content else "I couldn't generate a response."
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000,
+            )
+            return response.choices[0].message.content or "I couldn't generate a response."
 
     async def chat_stream(
         self,
@@ -191,33 +224,52 @@ Context will be provided from the search results. Use this context to answer the
         user_message = f"Context:\n{context}\n\n---\nUser Question: {query}"
         messages.append({"role": "user", "content": user_message})
 
-        # Stream response
-        stream = self.openai.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000,
-            stream=True,
-        )
+        # Stream response based on provider type
+        if self.provider_type == "anthropic":
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=2000,
+                system=self.SYSTEM_PROMPT,
+                messages=[m for m in messages if m["role"] != "system"],
+            ) as stream:
+                for text in stream.text_stream:
+                    yield text
+        else:
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000,
+                stream=True,
+            )
 
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
 
     async def generate_title(self, first_message: str) -> str:
         """Generate a title for a conversation based on the first message."""
-        response = self.openai.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Generate a short, descriptive title (max 50 chars) for a conversation that starts with the following message. Return only the title, no quotes or punctuation.",
-                },
-                {"role": "user", "content": first_message},
-            ],
-            temperature=0.7,
-            max_tokens=50,
-        )
+        if self.provider_type == "anthropic":
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=50,
+                system="Generate a short, descriptive title (max 50 chars) for a conversation that starts with the following message. Return only the title, no quotes or punctuation.",
+                messages=[{"role": "user", "content": first_message}],
+            )
+            title = response.content[0].text if response.content else "New Conversation"
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Generate a short, descriptive title (max 50 chars) for a conversation that starts with the following message. Return only the title, no quotes or punctuation.",
+                    },
+                    {"role": "user", "content": first_message},
+                ],
+                temperature=0.7,
+                max_tokens=50,
+            )
+            title = response.choices[0].message.content or "New Conversation"
 
-        title = response.choices[0].message.content or "New Conversation"
         return title[:50]  # Ensure max length

@@ -102,7 +102,7 @@ To use local embeddings:
 
 ```env
 EMBEDDING_PROVIDER=local
-ENABLE_CUDA=1  # If you have a GPU
+LOCAL_EMBEDDING_ENABLE_CUDA=1  # If you have a GPU
 ```
 
 ### Environment Variables

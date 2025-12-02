@@ -56,6 +56,7 @@ export interface ConversationListResponse {
 export interface ChatRequest {
   message: string;
   conversation_id?: string;
+  provider_id?: number;
 }
 
 export interface ChatResponse {
@@ -104,3 +105,58 @@ export interface VectorCountsResponse {
   counts: Record<number, number>;
   total: number;
 }
+
+// LLM Provider types
+export type ProviderType = 'openai' | 'anthropic' | 'custom';
+
+export interface LLMProvider {
+  id: number;
+  name: string;
+  provider_type: ProviderType;
+  model_id: string;
+  base_url: string | null;
+  host_country: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMProviderCreate {
+  name: string;
+  provider_type: ProviderType;
+  api_key: string;
+  model_id: string;
+  base_url?: string;
+  host_country?: string;
+  is_default?: boolean;
+}
+
+export interface LLMProviderUpdate {
+  name?: string;
+  provider_type?: ProviderType;
+  api_key?: string;
+  model_id?: string;
+  base_url?: string;
+  host_country?: string;
+  is_default?: boolean;
+}
+
+export interface ProviderListResponse {
+  providers: LLMProvider[];
+  total: number;
+}
+
+// Country codes for host location
+export const HOST_COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'FR', name: 'France' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' },
+] as const;

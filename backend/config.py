@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     embedding_provider: Literal["openai", "local"] = "openai"
     # OpenAI embeddings
     openai_embedding_model: str = "text-embedding-3-small"
-    # Local embeddings (sentence-transformers via t2v-transformers)
-    local_embedding_url: str = "http://t2v-transformers:8080"
+    # Local embeddings (sentence-transformers via embedding-server)
+    local_embedding_url: str = "http://embedding-server:8080"
     local_embedding_dimension: int = 384  # MiniLM-L6-v2 outputs 384 dimensions
 
     # Database Configuration

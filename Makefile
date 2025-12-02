@@ -45,8 +45,8 @@ help:
 	@echo "Current config:"
 	@echo "  EMBEDDING_PROVIDER=$(EMBEDDING_PROVIDER)"
 ifeq ($(EMBEDDING_PROVIDER),local)
-	@echo "  Local embeddings enabled (t2v-transformers will start)"
-	@echo "  ENABLE_CUDA=$(ENABLE_CUDA)"
+	@echo "  Local embeddings enabled (embedding-server will start)"
+	@echo "  LOCAL_EMBEDDING_ENABLE_CUDA=$(LOCAL_EMBEDDING_ENABLE_CUDA)"
 endif
 
 # Development
