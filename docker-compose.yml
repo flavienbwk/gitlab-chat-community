@@ -5,7 +5,7 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     ports:
-      - "10094:80"
+      - "3000:80"
     environment:
       - AUTH_USERNAME=${AUTH_USERNAME:-}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
