@@ -174,31 +174,6 @@ make shell-frontend   # Shell into frontend container
 
 ---
 
-## Troubleshooting
-
-### Common Issues
-
-**"Connection refused" errors**
-
-```bash
-# Ensure all services are running
-docker compose ps
-```
-
-**Indexing stuck**
-
-```bash
-# Check celery worker logs
-docker compose logs celery_worker
-```
-
-**Empty search results**
-
-- Ensure projects are indexed (check status in UI)
-- Try re-indexing the project
-
----
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
