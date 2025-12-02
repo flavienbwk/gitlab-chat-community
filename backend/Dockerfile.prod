@@ -22,9 +22,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download tiktoken encoding
-RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
-
 # ============================================
 # Stage 2: Production - Runtime image
 # ============================================
@@ -45,8 +42,8 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy tiktoken cache from builder
-COPY --from=builder /root/.cache /root/.cache
+# Pre-download tiktoken encoding (needs to be done in production stage)
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 
 # Copy application source code (explicitly, not "COPY . .")
 COPY main.py .
