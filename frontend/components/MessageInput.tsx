@@ -44,8 +44,8 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <form onSubmit={handleSubmit} className="flex items-end gap-3">
+    <div className="border-t border-gray-200 bg-white p-3 sm:p-4">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3">
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
@@ -55,10 +55,10 @@ export default function MessageInput({
             placeholder={placeholder}
             disabled={isLoading}
             rows={1}
-            className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 pr-12 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            style={{ minHeight: '48px', maxHeight: '200px' }}
+            className="w-full resize-none rounded-lg border border-gray-300 px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+            style={{ minHeight: '44px', maxHeight: '200px' }}
           />
-          <div className="absolute right-3 bottom-3 text-xs text-gray-400">
+          <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 text-xs text-gray-400">
             {message.length > 0 && `${message.length}`}
           </div>
         </div>
@@ -66,7 +66,7 @@ export default function MessageInput({
         <button
           type="submit"
           disabled={!message.trim() || isLoading}
-          className="flex-shrink-0 rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="flex-shrink-0 rounded-lg bg-blue-600 px-3 sm:px-4 py-2.5 sm:py-3 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? (
             <svg
@@ -106,7 +106,7 @@ export default function MessageInput({
         </button>
       </form>
 
-      <div className="mt-2 text-xs text-gray-500 text-center">
+      <div className="mt-2 text-xs text-gray-500 text-center hidden sm:block">
         Press Enter to send, Shift+Enter for new line
       </div>
     </div>

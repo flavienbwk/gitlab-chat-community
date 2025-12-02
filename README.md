@@ -120,6 +120,8 @@ LOCAL_EMBEDDING_ENABLE_CUDA=1  # If you have a GPU
 
 - [x] Models selection with open-source capabilities
 - [x] Prod configuration
+- [x] Regular project resync
+- [x] Mobile-friendly design
 
 ### Phase 4: Code Analysis
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useChat } from '@/hooks/useChat';
 import { useProjects } from '@/hooks/useProjects';
@@ -10,6 +11,8 @@ import MessageList from './MessageList';
 import ModelSelector from './ModelSelector';
 
 export default function ChatInterface() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const {
     messages,
     conversations,
@@ -31,27 +34,62 @@ export default function ChatInterface() {
     await sendMessage(content, selectedProvider?.id);
   };
 
+  // Close sidebar when selecting a conversation on mobile
+  const handleSelectConversation = (id: string) => {
+    selectConversation(id);
+    setSidebarOpen(false);
+  };
+
+  // Close sidebar when creating new conversation on mobile
+  const handleNewConversation = () => {
+    createNewConversation();
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="flex h-full bg-gray-50">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-72 bg-white border-r border-gray-200 flex flex-col">
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         {/* Logo & New Chat */}
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
-              </svg>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+                </svg>
+              </div>
+              <span className="font-semibold text-gray-900">GitLab Chat</span>
             </div>
-            <span className="font-semibold text-gray-900">GitLab Chat</span>
+            {/* Close button for mobile */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1 text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           <button
-            onClick={createNewConversation}
+            onClick={handleNewConversation}
             className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
             <svg
@@ -75,7 +113,7 @@ export default function ChatInterface() {
         <ConversationHistory
           conversations={conversations}
           currentId={currentConversation?.id}
-          onSelect={selectConversation}
+          onSelect={handleSelectConversation}
           onDelete={deleteConversation}
         />
 
@@ -174,23 +212,35 @@ export default function ChatInterface() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">
-                {currentConversation?.title || 'New Conversation'}
-              </h1>
-              {selectedProjects.length > 0 && (
-                <p className="text-sm text-gray-500">
-                  Searching in {selectedProjects.length} project
-                  {selectedProjects.length !== 1 ? 's' : ''}
-                </p>
-              )}
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 truncate">
+                  {currentConversation?.title || 'New Conversation'}
+                </h1>
+                {selectedProjects.length > 0 && (
+                  <p className="text-sm text-gray-500 hidden sm:block">
+                    Searching in {selectedProjects.length} project
+                    {selectedProjects.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               {/* Model Selector */}
               <ModelSelector
                 providers={providers}
@@ -202,9 +252,9 @@ export default function ChatInterface() {
               {selectedProjects.length === 0 && (
                 <Link
                   href="/projects"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="hidden sm:block text-sm text-blue-600 hover:text-blue-800 whitespace-nowrap"
                 >
-                  Select projects to search
+                  Select projects
                 </Link>
               )}
             </div>
@@ -213,7 +263,7 @@ export default function ChatInterface() {
 
         {/* Error Banner */}
         {error && (
-          <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-red-700 text-sm">
+          <div className="bg-red-50 border-b border-red-200 px-4 sm:px-6 py-3 text-red-700 text-sm">
             {error}
           </div>
         )}

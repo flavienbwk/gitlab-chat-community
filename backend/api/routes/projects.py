@@ -293,11 +293,11 @@ async def stop_indexing(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if project.indexing_status != "indexing":
+    if project.indexing_status not in ("indexing", "syncing"):
         return {
             "status": "not_indexing",
             "project_id": project_id,
-            "message": "Project is not currently being indexed",
+            "message": "Project is not currently being indexed or synced",
         }
 
     # Revoke all tasks for this project

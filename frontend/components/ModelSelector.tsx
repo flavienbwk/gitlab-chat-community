@@ -90,22 +90,22 @@ export default function ModelSelector({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
       >
         {selectedProvider ? (
           <>
             <span className="text-gray-600">{getProviderIcon(selectedProvider.provider_type)}</span>
-            <span className="font-medium text-gray-700 max-w-[150px] truncate">
+            <span className="font-medium text-gray-700 max-w-[80px] sm:max-w-[150px] truncate hidden xs:inline">
               {selectedProvider.name}
             </span>
             {selectedProvider.host_country && (
-              <span className="text-sm" title={`Hosted in ${HOST_COUNTRIES.find(c => c.code === selectedProvider.host_country)?.name || selectedProvider.host_country}`}>
+              <span className="text-sm hidden sm:inline" title={`Hosted in ${HOST_COUNTRIES.find(c => c.code === selectedProvider.host_country)?.name || selectedProvider.host_country}`}>
                 {getCountryFlag(selectedProvider.host_country)}
               </span>
             )}
           </>
         ) : (
-          <span className="text-gray-500">Select model</span>
+          <span className="text-gray-500 text-xs sm:text-sm">Select</span>
         )}
         <svg
           className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -118,7 +118,7 @@ export default function ModelSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+        <div className="absolute top-full right-0 sm:left-0 sm:right-auto mt-1 w-64 sm:w-72 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 max-h-[70vh] overflow-y-auto">
           {providers.map((provider) => (
             <button
               key={provider.id}

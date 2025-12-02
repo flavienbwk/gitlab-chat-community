@@ -35,4 +35,11 @@ celery_app.conf.update(
     # Worker settings
     worker_prefetch_multiplier=1,
     worker_concurrency=4,
+    # Periodic tasks (Celery Beat)
+    beat_schedule={
+        "sync-all-indexed-projects": {
+            "task": "tasks.sync.sync_all_indexed_projects",
+            "schedule": float(settings.sync_frequency),
+        },
+    },
 )

@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Repos path for cloned repositories
     repos_path: str = "/app/repos"
 
+    # Sync frequency in seconds (for periodic resync of indexed projects)
+    sync_frequency: int = 60
+
     @property
     def database_url(self) -> str:
         """Construct async database URL."""

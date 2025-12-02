@@ -144,6 +144,47 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A tasks.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - gitlab-chat-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Celery Beat scheduler for periodic tasks
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: celery -A tasks.celery_app beat -l info
+    environment:
+      # Database
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-gitlab_chat}
+      - POSTGRES_USER=${POSTGRES_USER:-gitlab_chat}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      # Sync frequency
+      - SYNC_FREQUENCY=${SYNC_FREQUENCY:-60}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep 'celery.*beat' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
     networks:
       - gitlab-chat-network
     restart: unless-stopped

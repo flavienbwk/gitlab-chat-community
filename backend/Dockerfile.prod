@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y \
     ripgrep \
     curl \
     libpq5 \
+    procps \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash appuser
 

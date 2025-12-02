@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     git \
     ripgrep \
     curl \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (cached layer)

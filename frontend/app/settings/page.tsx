@@ -6,7 +6,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -25,30 +25,30 @@ export default function SettingsPage() {
                   d="M10 19l-7-7m0 0l7-7m-7 7h18"
                 />
               </svg>
-              Back to Chat
+              <span className="hidden sm:inline">Back to Chat</span>
             </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-1">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             Configure your LLM providers and application settings.
           </p>
         </div>
 
         {/* Provider Manager */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
           <ProviderManager />
         </div>
 
         {/* Info Section */}
-        <div className="mt-8 bg-blue-50 rounded-xl border border-blue-200 p-6">
+        <div className="mt-6 sm:mt-8 bg-blue-50 rounded-xl border border-blue-200 p-4 sm:p-6">
           <h3 className="text-sm font-medium text-blue-800 mb-2">About LLM Providers</h3>
-          <div className="text-sm text-blue-700 space-y-2">
+          <div className="text-xs sm:text-sm text-blue-700 space-y-2">
             <p>
               <strong>OpenAI:</strong> Use models like GPT-4o, GPT-4-turbo, or GPT-3.5-turbo.
               Requires an OpenAI API key.

@@ -57,7 +57,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
       {messages.map((message) => (
         <div
           key={message.id}
@@ -66,16 +66,16 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           }`}
         >
           <div
-            className={`max-w-[80%] rounded-lg px-4 py-3 ${
+            className={`max-w-[90%] sm:max-w-[80%] rounded-lg px-3 sm:px-4 py-2 sm:py-3 ${
               message.role === 'user'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white border border-gray-200 text-gray-900'
             }`}
           >
             {message.role === 'user' ? (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
             ) : (
-              <div className="markdown-content">
+              <div className="markdown-content prose-sm sm:prose">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {message.content || '...'}
                 </ReactMarkdown>

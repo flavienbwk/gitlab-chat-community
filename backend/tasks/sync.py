@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -56,6 +56,72 @@ def update_project_status(
             update(Project).where(Project.id == project_id).values(**values)
         )
         session.commit()
+
+
+@shared_task(bind=True)
+def sync_all_indexed_projects(self) -> Dict:
+    """Sync all successfully indexed projects.
+
+    This task is triggered periodically by Celery Beat to keep
+    indexed projects up to date with GitLab.
+    """
+    logger.info("Starting periodic sync of all indexed projects")
+
+    try:
+        with get_sync_session() as session:
+            # Find all projects that are successfully indexed and not currently syncing
+            projects = (
+                session.query(Project)
+                .filter(
+                    Project.is_indexed == True,
+                    Project.indexing_status.in_(["completed", "error"]),
+                )
+                .all()
+            )
+
+            project_ids = [p.id for p in projects]
+
+            # Also recover any projects stuck in "syncing" for more than 2 minutes
+            # This handles cases where a sync task was killed mid-execution
+            stale_threshold = datetime.utcnow() - timedelta(minutes=2)
+            stale_projects = (
+                session.query(Project)
+                .filter(
+                    Project.is_indexed == True,
+                    Project.indexing_status == "syncing",
+                    Project.last_indexed_at < stale_threshold,
+                )
+                .all()
+            )
+
+            if stale_projects:
+                stale_ids = [p.id for p in stale_projects]
+                logger.warning(f"Recovering {len(stale_ids)} stale syncing projects: {stale_ids}")
+                # Reset their status so they can be synced
+                for project in stale_projects:
+                    project.indexing_status = "completed"
+                session.commit()
+                project_ids.extend(stale_ids)
+
+        if not project_ids:
+            logger.info("No indexed projects to sync")
+            return {"status": "completed", "projects_synced": 0}
+
+        logger.info(f"Queuing sync for {len(project_ids)} indexed projects")
+
+        # Queue sync for each project
+        for project_id in project_ids:
+            sync_project.delay(project_id)
+
+        return {
+            "status": "completed",
+            "projects_synced": len(project_ids),
+            "project_ids": project_ids,
+        }
+
+    except Exception as exc:
+        logger.error(f"Failed to queue periodic sync: {exc}")
+        return {"status": "error", "error": str(exc)}
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -127,6 +193,14 @@ def refresh_projects(self) -> Dict:
 # =============================================================================
 
 
+@shared_task(bind=True)
+def handle_sync_error(self, request, exc, traceback, project_id: int) -> Dict:
+    """Handle sync chain errors by resetting project status."""
+    logger.error(f"Sync chain failed for project {project_id}: {exc}")
+    update_project_status(project_id, "error", str(exc))
+    return {"status": "error", "error": str(exc), "project_id": project_id}
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def sync_project(self, project_id: int) -> Dict:
     """Incrementally sync a project - only index new/changed content.
@@ -155,7 +229,7 @@ def sync_project(self, project_id: int) -> Dict:
             from tasks.indexing import index_project
             return index_project.delay(project_id).get()
 
-        # Chain incremental sync tasks
+        # Chain incremental sync tasks with error handler
         workflow = chain(
             sync_readme.si(project_id, gitlab_id),
             sync_issues_incremental.s(project_id, gitlab_id, last_indexed_at.isoformat()),
@@ -165,7 +239,10 @@ def sync_project(self, project_id: int) -> Dict:
             finalize_sync.s(project_id),
         )
 
-        result = workflow.apply_async()
+        # Apply with error callback to reset status on failure
+        result = workflow.apply_async(
+            link_error=handle_sync_error.s(project_id)
+        )
         return {"status": "started", "task_id": str(result.id)}
 
     except Exception as exc:
@@ -657,10 +734,15 @@ def cleanup_deleted_items(
         raise self.retry(exc=exc)
 
 
-@shared_task
-def finalize_sync(previous_result: Dict, project_id: int) -> Dict:
+@shared_task(bind=True)
+def finalize_sync(self, previous_result: Dict, project_id: int) -> Dict:
     """Finalize the sync process."""
     logger.info(f"Finalizing sync for project {project_id}")
+
+    # Check if previous result indicates an error
+    if isinstance(previous_result, dict) and previous_result.get("status") == "error":
+        update_project_status(project_id, "error", previous_result.get("error"))
+        return previous_result
 
     update_project_status(project_id, "completed")
 
