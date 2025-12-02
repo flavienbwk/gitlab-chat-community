@@ -59,7 +59,8 @@ make clean            # Stop and remove volumes
 The system uses an AI-powered **QueryPlanner** to intelligently determine the best retrieval strategy for each user query.
 
 #### Flow
-```
+
+```text
 User Query + Conversation History
               ↓
         QueryPlanner.plan()
@@ -73,6 +74,7 @@ User Query + Conversation History
 ```
 
 #### Search Intents (`core/query_planner.py`)
+
 - `find_specific_item` - Looking for a specific issue/MR by number (e.g., "What is issue #123?")
 - `search_by_criteria` - Searching with filters like labels, state, date
 - `code_exploration` - Understanding code/implementation
@@ -83,6 +85,7 @@ User Query + Conversation History
 - `general_question` - General project questions
 
 #### Search Strategies
+
 - `api_only` - Only fetch from GitLab API (for specific IIDs, real-time data)
 - `vector_only` - Only semantic search (for conceptual questions)
 - `api_first` - API then augment with vector search
@@ -91,15 +94,19 @@ User Query + Conversation History
 - `code_deep` - Engage CodeAnalysisAgent for deep code exploration
 
 #### Sub-Queries
+
 The planner can decompose complex queries into multiple sub-queries:
+
 - **API queries**: `get_issue`, `get_mr`, `search_issues`, `search_mrs`
 - **Vector queries**: Semantic search with optional content type filters
 - **Code analysis**: Deep code exploration with file reading
 
 #### Example
+
 Query: "Compare authentication in issue #45 and MR !12"
 
 Generated plan:
+
 ```json
 {
   "intent": "compare_items",

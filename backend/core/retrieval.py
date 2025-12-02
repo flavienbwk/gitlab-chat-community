@@ -211,6 +211,16 @@ Query: "{query}"
                     sq_results = await self._execute_sub_query(sq, project_ids, top_k)
                     results.extend(sq_results)
 
+            # Fallback to vector search if API returned no results
+            if not results:
+                logger.info("API_ONLY returned no results, falling back to vector search")
+                vector_results = self.embedding_service.search(
+                    query=plan.original_query,
+                    project_ids=project_ids,
+                    top_k=top_k,
+                )
+                results.extend(vector_results)
+
         elif plan.strategy == SearchStrategy.VECTOR_ONLY:
             for sq in sorted_queries:
                 if sq.query_type == "vector":
@@ -274,13 +284,15 @@ Query: "{query}"
         for project_id in project_ids[:3]:  # Limit to first 3 projects
             try:
                 if sub_query.action == "get_issue":
-                    issue_iid = params.get("issue_iid")
+                    # Support both "issue_iid" and "iid" param names
+                    issue_iid = params.get("issue_iid") or params.get("iid")
                     if issue_iid:
                         issue = await self.gitlab_client.get_issue(project_id, issue_iid)
                         results.append(self._format_issue_result(issue, project_id))
 
                 elif sub_query.action == "get_mr":
-                    mr_iid = params.get("mr_iid")
+                    # Support both "mr_iid" and "iid" param names
+                    mr_iid = params.get("mr_iid") or params.get("iid")
                     if mr_iid:
                         mr = await self.gitlab_client.get_merge_request(project_id, mr_iid)
                         results.append(self._format_mr_result(mr, project_id))
