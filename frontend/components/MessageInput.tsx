@@ -44,7 +44,7 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-3 sm:p-4">
+    <div className="border-t border-gray-200 bg-white p-3 sm:p-4 safe-bottom">
       <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3">
         <div className="flex-1 relative">
           <textarea
@@ -54,9 +54,9 @@ export default function MessageInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isLoading}
-            rows={1}
+            rows={3}
             className="w-full resize-none rounded-lg border border-gray-300 px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            style={{ minHeight: '44px', maxHeight: '200px' }}
+            style={{ minHeight: '72px', maxHeight: '200px' }}
           />
           <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 text-xs text-gray-400">
             {message.length > 0 && `${message.length}`}

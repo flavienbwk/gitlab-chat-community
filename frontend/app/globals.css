@@ -12,6 +12,19 @@ body {
   background: rgb(var(--background-rgb));
 }
 
+/* Mobile viewport fix - account for browser navigation bars */
+html, body {
+  height: 100%;
+  height: 100dvh;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
